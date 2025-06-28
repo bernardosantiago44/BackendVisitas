@@ -7,12 +7,12 @@ namespace BackendVisitas.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class EmployeesController : ControllerBase
+    public class CustomersController : ControllerBase
     {
         private IConfiguration _configuration;
         private string _connectionString;
 
-        public EmployeesController(IConfiguration configuration)
+        public CustomersController(IConfiguration configuration)
         {
             this._configuration = configuration;
             this._connectionString = string.Empty;
@@ -23,24 +23,24 @@ namespace BackendVisitas.Controllers
         {
             var connection = _configuration.GetConnectionString(connectionString);
             if (string.IsNullOrEmpty(connection)) {
-                Log.Fatal("At EmployeesController, missing connection string: " + connectionString + " in appsettings.json.");
+                Log.Fatal("At CustomersController, missing connection string: " + connectionString + " in appsettings.json.");
                 throw new ArgumentException("Missing connection string '" + connectionString + "'.");
             }
             this._connectionString = connection;
         }
 
         [HttpPost]
-        public async Task<ActionResult<IEnumerable<Employee>>> GetAll()
+        public async Task<ActionResult<IEnumerable<Customer>>> GetAll()
         {
-            Log.Information("Fetching all employees' information from the database");
-            var employees = new List<Employee>();
+            Log.Information("Fetching all customers' information from the database");
+            var customers = new List<Customer>();
 
             using var connection = new SqlConnection(this._connectionString);
             await connection.OpenAsync();
 
             var query = @"
                 SELECT *
-                FROM Employees
+                FROM Customers
                 ORDER BY ID
             ";
             using var command = new SqlCommand(query, connection);
@@ -48,15 +48,15 @@ namespace BackendVisitas.Controllers
 
             while (await reader.ReadAsync())
             {
-                var employee = new Employee
+                var customer = new Customer
                 {
-                    Id = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Department = reader.GetString(2)
+                    Id = reader.GetInt32(2),
+                    Name = reader.GetString(0),
+                    Address = reader.GetString(1)
                 };
-                employees.Add(employee);
+                customers.Add(customer);
             }
-            return employees;
+            return customers;
         }
     }
 }
