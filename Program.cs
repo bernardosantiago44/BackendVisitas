@@ -14,6 +14,18 @@ namespace BackendVisitas
                 .CreateLogger();
             Log.Information("Backend Visitas - Bernardo Santiago");
 
+            // Add CORS Policy
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
+
             // Add services to the container.
 
             builder.Services.AddControllers();
@@ -28,6 +40,8 @@ namespace BackendVisitas
             {
                 app.MapOpenApi();
             }
+
+            app.UseCors("AllowAll");
 
             app.UseStaticFiles();
             app.UseRouting();
