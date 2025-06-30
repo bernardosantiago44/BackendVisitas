@@ -30,7 +30,7 @@ namespace BackendVisitas.Controllers
             this._connectionString = connection;
         }
 
-        [HttpPost]
+        [HttpPost("create")]
         public async Task<ActionResult> CreateVisit([FromBody] Visit newVisit)
         {
             Log.Information("VisitsController: Creating a new visit");
@@ -52,12 +52,52 @@ namespace BackendVisitas.Controllers
 
                 await command.ExecuteNonQueryAsync();
                 return Ok("Visit created successfully.");
-            } catch (Exception ex)
+            } catch (Exception error)
             {
-                Log.Error(ex.Message);
+                Log.Error(error.Message);
                 return StatusCode(500);
             }
 
+        }
+
+        [HttpPost("all")]
+        public async Task<ActionResult<IEnumerable<Visit>>> GetAll()
+        {
+            Log.Information("VisitsController: Fetching all visits.");
+
+            var visits = new List<Visit>();
+
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var query = @"
+                    SELECT * 
+                    FROM Visits
+                    ORDER BY ID
+                ";
+                using var command = new SqlCommand(query, connection);
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (reader.Read())
+                {
+                    Visit visit = new Visit
+                    {
+                        Id = reader.GetInt32(0),
+                        CustomerID = reader.GetInt32(1),
+                        EmployeeID = reader.GetInt32(2),
+                        VisitDate = reader.GetDateTime(3)
+                    };
+                    visits.Add(visit);
+                }
+
+                return Ok(visits);
+            } catch (Exception error)
+            {
+                Log.Error(error.Message);
+                return StatusCode(500);
+            }
         }
     }
 }
