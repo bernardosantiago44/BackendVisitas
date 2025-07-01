@@ -29,6 +29,13 @@ namespace BackendVisitas.Controllers
             this._connectionString = connection;
         }
 
+        // Testing purposes
+        [HttpGet("test")]
+        public async Task<ActionResult<String>> testGet()
+        {
+            return Ok("Hello World");
+        }
+
         [HttpPost]
         public async Task<ActionResult<IEnumerable<Employee>>> GetAll()
         {
@@ -57,6 +64,39 @@ namespace BackendVisitas.Controllers
                 employees.Add(employee);
             }
             return employees;
+        }
+
+        [HttpPost("{id}")]
+        public async Task<ActionResult<Employee>> GetById(int id)
+        {
+            Log.Information($"Fetching employee with ID {id}");
+            Employee? employee = null;
+
+            using var connection = new SqlConnection(this._connectionString);
+            await connection.OpenAsync();
+
+            var query = "SELECT Id, Name, Department FROM Employees WHERE Id = @Id";
+            using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@Id", id);
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                employee = new Employee
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    Department = reader.GetString(2)
+                };
+            }
+
+            if (employee == null)
+            {
+                Log.Warning($"Employee with ID {id} not found.");
+                return NotFound();
+            }
+
+            return Ok(employee);
         }
     }
 }

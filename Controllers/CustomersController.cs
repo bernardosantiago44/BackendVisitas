@@ -58,5 +58,38 @@ namespace BackendVisitas.Controllers
             }
             return customers;
         }
+
+        [HttpPost("{id}")]
+        public async Task<ActionResult<Customer>> GetById(int id)
+        {
+            Log.Information($"Fetching customer with ID {id}");
+            Customer? customer = null;
+
+            using var connection = new SqlConnection(this._connectionString);
+            await connection.OpenAsync();
+
+            var query = "SELECT Id, Name, Address FROM Customers WHERE Id = @Id";
+            using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@Id", id);
+
+            using var reader = await command.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                customer = new Customer
+                {
+                    Id = reader.GetInt32(0),
+                    Name = reader.GetString(1),
+                    Address = reader.GetString(2)
+                };
+            }
+
+            if (customer == null)
+            {
+                Log.Warning($"Customer with ID {id} not found.");
+                return NotFound();
+            }
+
+            return Ok(customer);
+        }
     }
 }
