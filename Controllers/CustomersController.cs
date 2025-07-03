@@ -2,6 +2,7 @@
 using BackendVisitas.Models;
 using Microsoft.Data.SqlClient;
 using Serilog;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace BackendVisitas.Controllers
 {
@@ -34,29 +35,36 @@ namespace BackendVisitas.Controllers
         {
             Log.Information("Fetching all customers' information from the database");
             var customers = new List<Customer>();
-
-            using var connection = new SqlConnection(this._connectionString);
-            await connection.OpenAsync();
-
-            var query = @"
-                SELECT *
-                FROM Customers
-                ORDER BY ID
-            ";
-            using var command = new SqlCommand(query, connection);
-            using var reader = await command.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            try
             {
-                var customer = new Customer
+
+                using var connection = new SqlConnection(this._connectionString);
+                await connection.OpenAsync();
+
+                var query = @"
+                    SELECT *
+                    FROM Customers
+                    ORDER BY ID
+                ";
+                using var command = new SqlCommand(query, connection);
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
                 {
-                    Id = reader.GetInt32(2),
-                    Name = reader.GetString(0),
-                    Address = reader.GetString(1)
-                };
-                customers.Add(customer);
+                    var customer = new Customer
+                    {
+                        Id = reader.GetInt32(2),
+                        Name = reader.GetString(0),
+                        Address = reader.GetString(1)
+                    };
+                    customers.Add(customer);
+                }
+                return Ok(customers);
+            } catch (Exception error)
+            {
+                Log.Error("CustomersController: Error fetching all users: " + error.Message);
+                return StatusCode(500);
             }
-            return customers;
         }
 
         [HttpPost("{id}")]
@@ -65,31 +73,38 @@ namespace BackendVisitas.Controllers
             Log.Information($"Fetching customer with ID {id}");
             Customer? customer = null;
 
-            using var connection = new SqlConnection(this._connectionString);
-            await connection.OpenAsync();
-
-            var query = "SELECT Id, Name, Address FROM Customers WHERE Id = @Id";
-            using var command = new SqlCommand(query, connection);
-            command.Parameters.AddWithValue("@Id", id);
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            try
             {
-                customer = new Customer
+                using var connection = new SqlConnection(this._connectionString);
+                await connection.OpenAsync();
+
+                var query = "SELECT Id, Name, Address FROM Customers WHERE Id = @Id";
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@Id", id);
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
                 {
-                    Id = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Address = reader.GetString(2)
-                };
-            }
+                    customer = new Customer
+                    {
+                        Id = reader.GetInt32(0),
+                        Name = reader.GetString(1),
+                        Address = reader.GetString(2)
+                    };
+                }
 
-            if (customer == null)
+                if (customer == null)
+                {
+                    Log.Warning($"Customer with ID {id} not found.");
+                    return NotFound();
+                }
+
+                return Ok(customer);
+            } catch (Exception error)
             {
-                Log.Warning($"Customer with ID {id} not found.");
-                return NotFound();
+                Log.Error($"CustomersController: Error fetching customer with ID {id}: {error.Message}");
+                return StatusCode(500);
             }
-
-            return Ok(customer);
         }
     }
 }

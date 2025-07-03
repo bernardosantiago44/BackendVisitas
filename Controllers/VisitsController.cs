@@ -38,6 +38,7 @@ namespace BackendVisitas.Controllers
             const string query = @"
                 INSERT INTO Visits (EmployeeID, CustomerID, VisitDate)
                 VALUES (@EmployeeID, @CustomerID, @VisitDate);
+                SELECT SCOPE_IDENTITY();
             ";
 
             try
@@ -50,8 +51,16 @@ namespace BackendVisitas.Controllers
                 command.Parameters.AddWithValue("@CustomerID", newVisit.CustomerID);
                 command.Parameters.AddWithValue("@VisitDate", newVisit.VisitDate);
 
-                await command.ExecuteNonQueryAsync();
-                return Ok("Visit created successfully.");
+                var createdId = Convert.ToInt32(await command.ExecuteScalarAsync());
+                var createdVisit = new Visit
+                {
+                    Id = createdId,
+                    EmployeeID = newVisit.EmployeeID,
+                    CustomerID = newVisit.CustomerID,
+                    VisitDate = newVisit.VisitDate
+                };
+
+                return Ok(createdVisit);
             } catch (Exception error)
             {
                 Log.Error(error.Message);

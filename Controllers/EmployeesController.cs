@@ -31,7 +31,7 @@ namespace BackendVisitas.Controllers
 
         // Testing purposes
         [HttpGet("test")]
-        public async Task<ActionResult<String>> testGet()
+        public ActionResult<String> TestGet()
         {
             return Ok("Hello World");
         }
@@ -42,28 +42,35 @@ namespace BackendVisitas.Controllers
             Log.Information("Fetching all employees' information from the database");
             var employees = new List<Employee>();
 
-            using var connection = new SqlConnection(this._connectionString);
-            await connection.OpenAsync();
-
-            var query = @"
-                SELECT *
-                FROM Employees
-                ORDER BY ID
-            ";
-            using var command = new SqlCommand(query, connection);
-            using var reader = await command.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            try
             {
-                var employee = new Employee
+                using var connection = new SqlConnection(this._connectionString);
+                await connection.OpenAsync();
+
+                var query = @"
+                    SELECT *
+                    FROM Employees
+                    ORDER BY ID
+                ";
+                using var command = new SqlCommand(query, connection);
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
                 {
-                    Id = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Department = reader.GetString(2)
-                };
-                employees.Add(employee);
+                    var employee = new Employee
+                    {
+                        Id = reader.GetInt32(0),
+                        Name = reader.GetString(1),
+                        Department = reader.GetString(2)
+                    };
+                    employees.Add(employee);
+                }
+                return Ok(employees);
+            } catch (Exception error)
+            {
+                Log.Error($"EmployeesController: Error fetching all employees: ${error.Message}");
+                return StatusCode(500, error);
             }
-            return employees;
         }
 
         [HttpPost("{id}")]
@@ -72,31 +79,38 @@ namespace BackendVisitas.Controllers
             Log.Information($"Fetching employee with ID {id}");
             Employee? employee = null;
 
-            using var connection = new SqlConnection(this._connectionString);
-            await connection.OpenAsync();
-
-            var query = "SELECT Id, Name, Department FROM Employees WHERE Id = @Id";
-            using var command = new SqlCommand(query, connection);
-            command.Parameters.AddWithValue("@Id", id);
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            try
             {
-                employee = new Employee
+                using var connection = new SqlConnection(this._connectionString);
+                await connection.OpenAsync();
+
+                var query = "SELECT Id, Name, Department FROM Employees WHERE Id = @Id";
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.AddWithValue("@Id", id);
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
                 {
-                    Id = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Department = reader.GetString(2)
-                };
-            }
+                    employee = new Employee
+                    {
+                        Id = reader.GetInt32(0),
+                        Name = reader.GetString(1),
+                        Department = reader.GetString(2)
+                    };
+                }
 
-            if (employee == null)
+                if (employee == null)
+                {
+                    Log.Warning($"Employee with ID {id} not found.");
+                    return NotFound();
+                }
+
+                return Ok(employee);
+            } catch (Exception error)
             {
-                Log.Warning($"Employee with ID {id} not found.");
-                return NotFound();
+                Log.Error($"EmployeesController: Error fetching employee with id ${id}: {error.Message}");
+                return StatusCode(500, error);
             }
-
-            return Ok(employee);
         }
     }
 }
