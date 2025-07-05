@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using OfficeOpenXml;
 using Serilog;
 
 namespace BackendVisitas
@@ -14,8 +15,9 @@ namespace BackendVisitas
                 .CreateLogger();
             Log.Information("Backend Visitas - Bernardo Santiago");
 
-            // Add CORS Policy
+            ExcelPackage.License.SetNonCommercialPersonal("Bernardo Santiago Marin");
 
+            // Add CORS Policy
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
