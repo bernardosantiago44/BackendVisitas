@@ -2,7 +2,7 @@
 using BackendVisitas.Models;
 using Microsoft.Data.SqlClient;
 using Serilog;
-using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BackendVisitas.Controllers
 {
@@ -11,12 +11,14 @@ namespace BackendVisitas.Controllers
     public class CustomersController : ControllerBase
     {
         private IConfiguration _configuration;
+        private readonly ICustomersService _customersService;
         private string _connectionString;
 
-        public CustomersController(IConfiguration configuration)
+        public CustomersController(IConfiguration configuration, ICustomersService customersService)
         {
             this._configuration = configuration;
             this._connectionString = string.Empty;
+            this._customersService = customersService;
             this.setupConnectionString("DefaultConnection");
         }
 
@@ -33,38 +35,14 @@ namespace BackendVisitas.Controllers
         [HttpPost]
         public async Task<ActionResult<IEnumerable<Customer>>> GetAll()
         {
-            Log.Information("Fetching all customers' information from the database");
-            var customers = new List<Customer>();
-            try
+            var customers = await _customersService.GetAllAsync();
+
+            if (customers.IsNullOrEmpty())
             {
-
-                using var connection = new SqlConnection(this._connectionString);
-                await connection.OpenAsync();
-
-                var query = @"
-                    SELECT *
-                    FROM Customers
-                    ORDER BY ID
-                ";
-                using var command = new SqlCommand(query, connection);
-                using var reader = await command.ExecuteReaderAsync();
-
-                while (await reader.ReadAsync())
-                {
-                    var customer = new Customer
-                    {
-                        Id = reader.GetInt32(2),
-                        Name = reader.GetString(0),
-                        Address = reader.GetString(1)
-                    };
-                    customers.Add(customer);
-                }
-                return Ok(customers);
-            } catch (Exception error)
-            {
-                Log.Error("CustomersController: Error fetching all users: " + error.Message);
                 return StatusCode(500);
             }
+
+            return Ok(customers);
         }
 
         [HttpPost("{id}")]

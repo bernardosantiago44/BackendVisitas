@@ -1,6 +1,7 @@
 ﻿using BackendVisitas.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using OfficeOpenXml;
 using Serilog;
 
 namespace BackendVisitas.Controllers
@@ -10,12 +11,21 @@ namespace BackendVisitas.Controllers
     public class VisitsController: ControllerBase
     {
         private IConfiguration _configuration;
+        private readonly IVisitService _visitService;
+        private readonly ICustomersService _customersService;
+        private readonly IEmployeeService _employeeService;
         private string _connectionString;
 
-        public VisitsController(IConfiguration configuration)
+        public VisitsController(IConfiguration configuration, 
+                                IVisitService visitService,
+                                ICustomersService customerService,
+                                IEmployeeService employeeService)
         {
-            this._configuration = configuration;
             this._connectionString = string.Empty;
+            this._configuration = configuration;
+            this._visitService = visitService;
+            this._customersService = customerService;
+            this._employeeService = employeeService;
             setupConnectionString("DefaultConnection");
         }
 
@@ -70,43 +80,60 @@ namespace BackendVisitas.Controllers
         }
 
         [HttpPost("all")]
-        public async Task<ActionResult<IEnumerable<Visit>>> GetAll()
+        public async Task<ActionResult<IEnumerable<Visit>>> GetAllAsync()
         {
             Log.Information("VisitsController: Fetching all visits.");
 
-            var visits = new List<Visit>();
-
-            try
+            var visits = await _visitService.GetAllAsync();
+            if (visits == null)
             {
-                using var connection = new SqlConnection(_connectionString);
-                await connection.OpenAsync();
-
-                var query = @"
-                    SELECT * 
-                    FROM Visits
-                    ORDER BY ID
-                ";
-                using var command = new SqlCommand(query, connection);
-                using var reader = await command.ExecuteReaderAsync();
-
-                while (reader.Read())
-                {
-                    Visit visit = new Visit
-                    {
-                        Id = reader.GetInt32(0),
-                        CustomerID = reader.GetInt32(1),
-                        EmployeeID = reader.GetInt32(2),
-                        VisitDate = reader.GetDateTime(3)
-                    };
-                    visits.Add(visit);
-                }
-
-                return Ok(visits);
-            } catch (Exception error)
-            {
-                Log.Error(error.Message);
                 return StatusCode(500);
             }
+            return Ok(visits);
         }
+
+        [HttpPost("report")]
+        public async Task<IActionResult> GenerateVisitsReport()
+        {
+            Log.Information("VisitsController - Generating visits report");
+            IEnumerable<Visit> visits = await _visitService.GetAllAsync();
+            IEnumerable<Customer> customers = await _customersService.GetAllAsync();
+            IEnumerable<Employee> employees = await _employeeService.GetAllAsync();
+
+            using var package = new ExcelPackage();
+            var worksheet = package.Workbook.Worksheets.Add("Visits");
+
+            // Headers
+            worksheet.Cells[1, 1].Value = "Visit ID";
+            worksheet.Cells[1, 2].Value = "Customer";
+            worksheet.Cells[1, 3].Value = "Employee";
+            worksheet.Cells[1, 4].Value = "Date";
+
+            // Data rows
+            for (int i = 0; i < visits.Count(); i++) 
+            {
+                var visit = visits.ElementAt(i);
+
+                var customer = Array.Find(customers.ToArray(), customer => customer.Id == visit.CustomerID);
+                var employee = Array.Find(employees.ToArray(), employee => employee.Id == visit.EmployeeID);
+
+                worksheet.Cells[i + 2, 1].Value = visit.Id;
+                worksheet.Cells[i + 2, 2].Value = customer?.Name ?? visit.CustomerID.ToString();
+                worksheet.Cells[i + 2, 3].Value = employee?.Name ?? visit.EmployeeID.ToString();
+                worksheet.Cells[i + 2, 4].Value = visit.VisitDate.ToString("yyyy-MM-dd");
+            }
+
+            worksheet.Cells.AutoFitColumns();
+
+            // Return the Excel file as a downloadable response
+            var stream = new MemoryStream();
+            package.SaveAs(stream);
+            stream.Position = 0;
+
+            var fileName = "VisitsReport.xlsx";
+            var contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            return File(stream, contentType, fileName);
+        }
+
     }
 }

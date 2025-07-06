@@ -2,6 +2,7 @@
 using BackendVisitas.Models;
 using Microsoft.Data.SqlClient;
 using Serilog;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BackendVisitas.Controllers
 {
@@ -10,12 +11,14 @@ namespace BackendVisitas.Controllers
     public class EmployeesController : ControllerBase
     {
         private IConfiguration _configuration;
+        private IEmployeeService _employeeService;
         private string _connectionString;
 
-        public EmployeesController(IConfiguration configuration)
+        public EmployeesController(IConfiguration configuration, IEmployeeService employeeService)
         {
             this._configuration = configuration;
             this._connectionString = string.Empty;
+            this._employeeService = employeeService;
             this.setupConnectionString("DefaultConnection");
         }
 
@@ -29,48 +32,17 @@ namespace BackendVisitas.Controllers
             this._connectionString = connection;
         }
 
-        // Testing purposes
-        [HttpGet("test")]
-        public ActionResult<String> TestGet()
-        {
-            return Ok("Hello World");
-        }
-
         [HttpPost]
         public async Task<ActionResult<IEnumerable<Employee>>> GetAll()
         {
-            Log.Information("Fetching all employees' information from the database");
-            var employees = new List<Employee>();
+            var employees = await _employeeService.GetAllAsync();
 
-            try
+            if (employees.IsNullOrEmpty())
             {
-                using var connection = new SqlConnection(this._connectionString);
-                await connection.OpenAsync();
-
-                var query = @"
-                    SELECT *
-                    FROM Employees
-                    ORDER BY ID
-                ";
-                using var command = new SqlCommand(query, connection);
-                using var reader = await command.ExecuteReaderAsync();
-
-                while (await reader.ReadAsync())
-                {
-                    var employee = new Employee
-                    {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        Department = reader.GetString(2)
-                    };
-                    employees.Add(employee);
-                }
-                return Ok(employees);
-            } catch (Exception error)
-            {
-                Log.Error($"EmployeesController: Error fetching all employees: ${error.Message}");
-                return StatusCode(500, error);
+                return StatusCode(500);
             }
+
+            return Ok(employees);
         }
 
         [HttpPost("{id}")]

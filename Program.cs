@@ -1,3 +1,4 @@
+using BackendVisitas.Controllers;
 using Microsoft.Data.SqlClient;
 using OfficeOpenXml;
 using Serilog;
@@ -34,6 +35,9 @@ namespace BackendVisitas
             builder.Services.AddTransient<SqlConnection>(_ => 
             new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
             builder.Services.AddOpenApi();
+            builder.Services.AddScoped<IVisitService, VisitService>();
+            builder.Services.AddScoped<ICustomersService, CustomersService>();
+            builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 
             var app = builder.Build();
 
